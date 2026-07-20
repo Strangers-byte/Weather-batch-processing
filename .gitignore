@@ -1,0 +1,37 @@
+# Environment & secrets
+.env
+airflow/.env
+weather_dbt/profiles.yml
+weather_dbt/.user.yml
+logs/
+
+# Virtual environment
+weather_env/
+
+# Airflow runtime
+airflow/
+airflow/logs/
+airflow/config/
+airflow/plugins/
+
+# Database files
+data/
+db/
+duckdb_data/
+*.duckdb
+
+# dbt
+weather_dbt/target/
+weather_dbt/dbt_packages/
+weather_dbt/logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+# OS
+.DS_Store
+testDB.py
+
+# CSV Files
+*.csv
