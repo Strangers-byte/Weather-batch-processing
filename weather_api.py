@@ -20,8 +20,7 @@ class WeatherAPIClient:
             params = {
                 "latitude": city['lat'], 
                 "longitude": city['lon'], 
-                "current": "temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code",
-                "hourly": "temperature_2m"
+                "hourly": "temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code"
             }
             response = requests.get(WEATHER_URL, params=params, timeout=30)
 
@@ -37,7 +36,7 @@ class WeatherAPIClient:
             params={
             "latitude": city['lat'], 
             "longitude": city['lon'], 
-            "current": "european_aqi,us_aqi,pm10,pm2_5"
+            "hourly": "european_aqi,us_aqi,pm10,pm2_5"
             }
             response = requests.get(AIR_QUALITY_URL, params=params, timeout=30)
 

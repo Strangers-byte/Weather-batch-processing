@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: main
+    tables:
+      - name: weather_json
+        external:
+            location: "D:/MyData/Ahmads/Projects/DBT/Weather/data/raw/weather/*.json"
+            format: json
+      - name: air_quality_json
+        external:
+            location: "D:/MyData/Ahmads/Projects/DBT/Weather/data/raw/air_quality/*.json"
+            format: json
