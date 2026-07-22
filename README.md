@@ -6,7 +6,7 @@ A data pipeline that fetches hourly weather and air quality data for 10 German c
 - **Extraction:** Python (requests) with rate limiting & retries
 - **Storage & Query:** DuckDB
 - **Transformation:** dbt (data build tool)
-- **Containerization:** Docker Compose
+- **Containerization:** Docker Compose (Not implemented yet!)
 
 ## Data
 
