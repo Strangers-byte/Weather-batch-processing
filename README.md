@@ -3,8 +3,6 @@
 A data pipeline that fetches hourly weather and air quality data for 10 German cities from the Open‑Meteo API, processes it with dbt + DuckDB, and models it in a star schema with a Type 2 Slowly Changing Dimension.
 
 ## Tech Stack
-
-- **Orchestration:** Apache Airflow
 - **Extraction:** Python (requests) with rate limiting & retries
 - **Storage & Query:** DuckDB
 - **Transformation:** dbt (data build tool)
