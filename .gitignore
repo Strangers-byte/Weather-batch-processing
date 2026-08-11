@@ -7,7 +7,6 @@ weather_env/
 
 # Database files (generated)
 *.duckdb
-data/
 db/
 duckdb_data/
 
