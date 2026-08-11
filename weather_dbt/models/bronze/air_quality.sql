@@ -7,4 +7,4 @@
 SELECT
     *,
     current_timestamp AS bronze_loaded_at
-FROM read_json_auto('D:/MyData/Ahmads/Projects/DBT/Weather/ingestion/data/raw/air_quality/*.json')
+FROM read_json_auto('ingestion/data/raw/air_quality/*.json')

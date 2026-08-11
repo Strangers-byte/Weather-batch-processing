@@ -23,21 +23,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           pip install dbt-duckdb
 
-      - name: Install dbt dependencies
-        working-directory: weather_dbt
-        run: dbt deps --profiles-dir .
+      - name: Install dbt packages
+        run: dbt deps --project-dir weather_dbt --profiles-dir weather_dbt
 
       - name: Run ingestion
         run: python ingestion/main.py
 
       - name: Run dbt
-        working-directory: weather_dbt
-        run: dbt build --profiles-dir .
+        run: dbt build --project-dir weather_dbt --profiles-dir weather_dbt
 
       - name: Generate dashboard
         run: python generate_dashboard.py

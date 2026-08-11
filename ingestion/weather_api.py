@@ -112,7 +112,8 @@ class WeatherAPIClient:
         Idempotent save: filename is deterministic per city + date range.
         Overwrites existing file to ensure freshness.
         """
-        dir_path = Path(f"data/raw/{data_type}")
+        script_dir = Path(__file__).parent
+        dir_path = script_dir / f"data/raw/{data_type}"
         dir_path.mkdir(parents=True, exist_ok=True)
 
 
