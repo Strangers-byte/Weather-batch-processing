@@ -29,6 +29,7 @@ weather_dbt/logs/
 __pycache__/
 *.pyc
 *.pyo
+__init__.py
 # OS
 .DS_Store
 testDB.py
