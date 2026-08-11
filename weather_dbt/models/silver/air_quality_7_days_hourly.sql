@@ -1,22 +1,18 @@
 {{
   config(
-    materialized = 'view',
+    materialized = 'table',
     )
 }}
 
 WITH air_quality AS (
     SELECT
-        latitude,
-        longitude,
-        UNNEST(
-            list_zip(
-                hourly.time,
-                hourly.european_aqi,
-                hourly.us_aqi,
-                hourly.pm10,
-                hourly.pm2_5
-            )
-        ) AS hourly_row
+        payload.latitude,
+        payload.longitude,
+        UNNEST(payload.hourly.time) AS observation_time,
+        UNNEST(payload.hourly.european_aqi) AS european_aqi,
+        UNNEST(payload.hourly.us_aqi) AS us_aqi,
+        UNNEST(payload.hourly.pm10) AS pm10,
+        UNNEST(payload.hourly.pm2_5) AS pm2_5
     FROM {{ ref('air_quality') }}
 ),
 
@@ -30,11 +26,11 @@ city_seed AS (
 
 SELECT
     c.city_id,
-    aq.hourly_row[1]::timestamp AS observation_time,
-    aq.hourly_row[2]::integer AS european_aqi,
-    aq.hourly_row[3]::integer AS us_aqi,
-    aq.hourly_row[4]::double AS pm10,
-    aq.hourly_row[5]::double AS pm2_5,
+    aq.observation_time::timestamp AS observation_time,
+    aq.european_aqi::integer AS european_aqi,
+    aq.us_aqi::integer AS us_aqi,
+    aq.pm10::double AS pm10,
+    aq.pm2_5::double AS pm2_5,
     current_timestamp AS silver_loaded_at
 FROM air_quality aq
 JOIN city_seed c

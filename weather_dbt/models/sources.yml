@@ -6,9 +6,9 @@ sources:
     tables:
       - name: weather_json
         external:
-            location: "D:/MyData/Ahmads/Projects/DBT/Weather/data/raw/weather/*.json"
+            location: "D:/MyData/Ahmads/Projects/DBT/Weather/ingestion/data/raw/weather/*.json"
             format: json
       - name: air_quality_json
         external:
-            location: "D:/MyData/Ahmads/Projects/DBT/Weather/data/raw/air_quality/*.json"
+            location: "D:/MyData/Ahmads/Projects/DBT/Weather/ingestion/data/raw/air_quality/*.json"
             format: json

@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: dim_city
+    description: "Dimension table for German cities"
+    columns:
+      - name: city_id
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_weather_daily
+    description: "Daily weather aggregates per city"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - city_id
+            - date_day
+    columns:
+      - name: city_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_city')
+              field: city_id
+      - name: date_day
+        tests:
+          - not_null
+
+  - name: fct_weather_weekly
+    description: "Weekly weather aggregates with city rankings"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - city_id
+            - week_start
+    columns:
+      - name: city_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_city')
+              field: city_id
+      - name: week_start
+        tests:
+          - not_null
+      - name: hour_count
+        description: "168 hours for a complete week"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 168
+              max_value: 168
+      - name: rank_by_avg_temp
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 10
