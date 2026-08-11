@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather Insights Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --text: #e2e8f0; --muted: #94a3b8;
+    --accent: #38bdf8; --hot: #f87171; --cold: #60a5fa; --rain: #34d399;
+    --aqi-good: #34d399; --aqi-moderate: #fbbf24; --aqi-bad: #f87171; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; }
+  header { text-align: center; margin-bottom: 2rem; }
+  header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em;
+    background: linear-gradient(90deg, var(--accent), var(--rain));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  header p { color: var(--muted); margin-top: 0.5rem; font-size: 0.95rem; }
+  .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+    background: rgba(56,189,248,0.1); color: var(--accent); border: 1px solid rgba(56,189,248,0.2); margin-top: 0.75rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 1400px; margin: 0 auto; }
+  .card { background: var(--card); border-radius: 1rem; padding: 1.5rem;
+    border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+  .card h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .metric { display: flex; flex-direction: column; gap: 0.25rem; }
+  .metric-value { font-size: 2.5rem; font-weight: 700; line-height: 1; }
+  .metric-label { color: var(--muted); font-size: 0.875rem; }
+  .chart-container { position: relative; height: 300px; }
+  .chart-container-lg { position: relative; height: 400px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  th { text-align: left; padding: 0.75rem; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(255,255,255,0.1); }
+  td { padding: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .rank { font-weight: 700; font-size: 0.875rem; }
+  .rank-1 { color: #fbbf24; } .rank-2 { color: #94a3b8; } .rank-3 { color: #b45309; }
+  .wide { grid-column: 1 / -1; }
+  @media (min-width: 768px) { .wide { grid-column: span 2; } }
+  .footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 2rem; }
+  .aqi-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .aqi-good { background: rgba(52,211,153,0.15); color: #34d399; }
+  .aqi-moderate { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .aqi-bad { background: rgba(248,113,113,0.15); color: #f87171; }
+  .aqi-missing { background: rgba(148,163,184,0.15); color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Weather Insights Dashboard</h1>
+  <p>10 German Cities · <span id="date-range">--</span> · Open-Meteo API</p>
+  <span class="badge">Bronze → Silver → Gold · dbt · DuckDB</span>
+</header>
+
+<div class="grid">
+  <div class="card">
+    <h2>🏆 Hottest City</h2>
+    <div class="metric">
+      <span class="metric-value" style="color:var(--hot)" id="hottest-city">--</span>
+      <span class="metric-label" id="hottest-temp">-- °C avg</span>
+    </div>
+  </div>
+  <div class="card">
+    <h2>💨 Windiest</h2>
+    <div class="metric">
+      <span class="metric-value" style="color:var(--accent)" id="windiest-city">--</span>
+      <span class="metric-label" id="windiest-speed">-- km/h max</span>
+    </div>
+  </div>
+  <div class="card">
+    <h2>🏭 Worst Air Quality</h2>
+    <div class="metric">
+      <span class="metric-value" style="color:var(--aqi-bad)" id="worst-aqi-city">--</span>
+      <span class="metric-label" id="worst-aqi-val">-- AQI max</span>
+    </div>
+  </div>
+  <div class="card wide">
+    <h2>📈 Daily Average Temperature by City</h2>
+    <div class="chart-container-lg"><canvas id="dailyTempChart"></canvas></div>
+  </div>
+  <div class="card wide">
+    <h2>💧 Daily Average Humidity by City</h2>
+    <div class="chart-container-lg"><canvas id="dailyHumidityChart"></canvas></div>
+  </div>
+  <div class="card wide">
+    <h2>🏭 Daily Max European AQI by City</h2>
+    <div class="chart-container-lg"><canvas id="dailyAqiChart"></canvas></div>
+  </div>
+  <div class="card wide">
+    <h2>🏅 Weekly Temperature Rankings</h2>
+    <div class="chart-container"><canvas id="rankingChart"></canvas></div>
+  </div>
+  <div class="card wide">
+    <h2>🏭 Weekly Max Air Quality Index</h2>
+    <div class="chart-container"><canvas id="aqiChart"></canvas></div>
+  </div>
+  <div class="card wide">
+    <h2>📋 Weekly Summary Table</h2>
+    <table id="summaryTable">
+      <thead><tr>
+        <th>Rank</th><th>City</th><th>Avg Temp (°C)</th><th>Min / Max (°C)</th>
+        <th>Max Wind (km/h)</th><th>Max AQI</th><th>Data Quality</th>
+      </tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer">Generated on 2026-08-11 21:25:03 · Pipeline: Python → DuckDB → dbt → HTML</div>
+
+<script>
+const dailyData = [{"city_id": "berlin", "date_day": "2026-08-11", "min_temp_c": 13.8, "max_temp_c": 21.3, "avg_temp_c": 18.095833333333335, "avg_humidity_pct": 51.5, "max_wind_speed_kmh": 16.1, "min_european_aqi": 19, "max_european_aqi": 30, "avg_european_aqi": 23.708333333333332, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "berlin", "date_day": "2026-08-12", "min_temp_c": 14.3, "max_temp_c": 24.7, "avg_temp_c": 19.912499999999994, "avg_humidity_pct": 47.5, "max_wind_speed_kmh": 9.3, "min_european_aqi": 14, "max_european_aqi": 41, "avg_european_aqi": 27.208333333333332, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "berlin", "date_day": "2026-08-13", "min_temp_c": 15.9, "max_temp_c": 27.8, "avg_temp_c": 21.858333333333338, "avg_humidity_pct": 45.375, "max_wind_speed_kmh": 9.0, "min_european_aqi": 18, "max_european_aqi": 38, "avg_european_aqi": 27.916666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "berlin", "date_day": "2026-08-14", "min_temp_c": 16.5, "max_temp_c": 32.1, "avg_temp_c": 24.516666666666666, "avg_humidity_pct": 41.416666666666664, "max_wind_speed_kmh": 10.1, "min_european_aqi": 19, "max_european_aqi": 53, "avg_european_aqi": 34.375, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "berlin", "date_day": "2026-08-15", "min_temp_c": 19.3, "max_temp_c": 34.5, "avg_temp_c": 26.808333333333334, "avg_humidity_pct": 40.041666666666664, "max_wind_speed_kmh": 12.1, "min_european_aqi": 22, "max_european_aqi": 65, "avg_european_aqi": 43.375, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "berlin", "date_day": "2026-08-16", "min_temp_c": 19.4, "max_temp_c": 23.8, "avg_temp_c": 21.445833333333336, "avg_humidity_pct": 77.375, "max_wind_speed_kmh": 12.3, "min_european_aqi": 14, "max_european_aqi": 27, "avg_european_aqi": 20.5, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "berlin", "date_day": "2026-08-17", "min_temp_c": 18.3, "max_temp_c": 25.8, "avg_temp_c": 21.724999999999998, "avg_humidity_pct": 77.91666666666667, "max_wind_speed_kmh": 8.6, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "cologne", "date_day": "2026-08-11", "min_temp_c": 16.9, "max_temp_c": 27.1, "avg_temp_c": 22.32916666666667, "avg_humidity_pct": 38.583333333333336, "max_wind_speed_kmh": 13.3, "min_european_aqi": 15, "max_european_aqi": 34, "avg_european_aqi": 25.083333333333332, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "cologne", "date_day": "2026-08-12", "min_temp_c": 17.8, "max_temp_c": 32.0, "avg_temp_c": 25.36666666666666, "avg_humidity_pct": 28.541666666666668, "max_wind_speed_kmh": 11.9, "min_european_aqi": 14, "max_european_aqi": 45, "avg_european_aqi": 29.25, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "cologne", "date_day": "2026-08-13", "min_temp_c": 21.1, "max_temp_c": 35.7, "avg_temp_c": 28.741666666666664, "avg_humidity_pct": 21.458333333333332, "max_wind_speed_kmh": 13.0, "min_european_aqi": 20, "max_european_aqi": 59, "avg_european_aqi": 35.583333333333336, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "cologne", "date_day": "2026-08-14", "min_temp_c": 21.3, "max_temp_c": 36.0, "avg_temp_c": 29.14583333333334, "avg_humidity_pct": 26.791666666666668, "max_wind_speed_kmh": 10.9, "min_european_aqi": 18, "max_european_aqi": 67, "avg_european_aqi": 41.708333333333336, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "cologne", "date_day": "2026-08-15", "min_temp_c": 21.7, "max_temp_c": 31.2, "avg_temp_c": 25.72916666666667, "avg_humidity_pct": 48.458333333333336, "max_wind_speed_kmh": 10.0, "min_european_aqi": 20, "max_european_aqi": 55, "avg_european_aqi": 33.25, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "cologne", "date_day": "2026-08-16", "min_temp_c": 18.8, "max_temp_c": 26.2, "avg_temp_c": 22.1375, "avg_humidity_pct": 69.29166666666667, "max_wind_speed_kmh": 9.8, "min_european_aqi": 25, "max_european_aqi": 26, "avg_european_aqi": 25.5, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "cologne", "date_day": "2026-08-17", "min_temp_c": 17.4, "max_temp_c": 25.3, "avg_temp_c": 21.308333333333334, "avg_humidity_pct": 68.29166666666667, "max_wind_speed_kmh": 9.4, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "dortmund", "date_day": "2026-08-11", "min_temp_c": 15.3, "max_temp_c": 25.3, "avg_temp_c": 20.445833333333333, "avg_humidity_pct": 42.791666666666664, "max_wind_speed_kmh": 15.1, "min_european_aqi": 14, "max_european_aqi": 35, "avg_european_aqi": 24.666666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "dortmund", "date_day": "2026-08-12", "min_temp_c": 14.7, "max_temp_c": 30.7, "avg_temp_c": 23.36666666666667, "avg_humidity_pct": 32.291666666666664, "max_wind_speed_kmh": 16.6, "min_european_aqi": 16, "max_european_aqi": 41, "avg_european_aqi": 27.958333333333332, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "dortmund", "date_day": "2026-08-13", "min_temp_c": 19.6, "max_temp_c": 35.2, "avg_temp_c": 28.03333333333333, "avg_humidity_pct": 23.125, "max_wind_speed_kmh": 12.6, "min_european_aqi": 15, "max_european_aqi": 53, "avg_european_aqi": 32.791666666666664, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "dortmund", "date_day": "2026-08-14", "min_temp_c": 23.1, "max_temp_c": 35.6, "avg_temp_c": 29.57083333333333, "avg_humidity_pct": 24.625, "max_wind_speed_kmh": 14.0, "min_european_aqi": 26, "max_european_aqi": 63, "avg_european_aqi": 44.416666666666664, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "dortmund", "date_day": "2026-08-15", "min_temp_c": 22.1, "max_temp_c": 30.6, "avg_temp_c": 26.212500000000006, "avg_humidity_pct": 43.458333333333336, "max_wind_speed_kmh": 11.1, "min_european_aqi": 22, "max_european_aqi": 40, "avg_european_aqi": 30.583333333333332, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "dortmund", "date_day": "2026-08-16", "min_temp_c": 18.9, "max_temp_c": 26.4, "avg_temp_c": 22.099999999999994, "avg_humidity_pct": 65.79166666666667, "max_wind_speed_kmh": 13.2, "min_european_aqi": 16, "max_european_aqi": 22, "avg_european_aqi": 19.0, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "dortmund", "date_day": "2026-08-17", "min_temp_c": 16.2, "max_temp_c": 24.2, "avg_temp_c": 19.87916666666667, "avg_humidity_pct": 67.0, "max_wind_speed_kmh": 10.4, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "duesseldorf", "date_day": "2026-08-11", "min_temp_c": 16.2, "max_temp_c": 27.0, "avg_temp_c": 21.929166666666664, "avg_humidity_pct": 38.916666666666664, "max_wind_speed_kmh": 15.1, "min_european_aqi": 15, "max_european_aqi": 36, "avg_european_aqi": 24.416666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "duesseldorf", "date_day": "2026-08-12", "min_temp_c": 16.9, "max_temp_c": 33.0, "avg_temp_c": 25.570833333333336, "avg_humidity_pct": 27.166666666666668, "max_wind_speed_kmh": 15.5, "min_european_aqi": 12, "max_european_aqi": 51, "avg_european_aqi": 29.333333333333332, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "duesseldorf", "date_day": "2026-08-13", "min_temp_c": 22.4, "max_temp_c": 36.2, "avg_temp_c": 29.637500000000003, "avg_humidity_pct": 18.833333333333332, "max_wind_speed_kmh": 12.2, "min_european_aqi": 20, "max_european_aqi": 55, "avg_european_aqi": 34.0, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "duesseldorf", "date_day": "2026-08-14", "min_temp_c": 22.5, "max_temp_c": 35.5, "avg_temp_c": 29.258333333333326, "avg_humidity_pct": 27.083333333333332, "max_wind_speed_kmh": 13.9, "min_european_aqi": 23, "max_european_aqi": 65, "avg_european_aqi": 40.708333333333336, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "duesseldorf", "date_day": "2026-08-15", "min_temp_c": 22.1, "max_temp_c": 30.1, "avg_temp_c": 25.91666666666667, "avg_humidity_pct": 49.208333333333336, "max_wind_speed_kmh": 11.5, "min_european_aqi": 19, "max_european_aqi": 46, "avg_european_aqi": 30.166666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "duesseldorf", "date_day": "2026-08-16", "min_temp_c": 19.2, "max_temp_c": 26.6, "avg_temp_c": 22.512500000000003, "avg_humidity_pct": 65.08333333333333, "max_wind_speed_kmh": 11.0, "min_european_aqi": 19, "max_european_aqi": 24, "avg_european_aqi": 21.5, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "duesseldorf", "date_day": "2026-08-17", "min_temp_c": 17.4, "max_temp_c": 26.0, "avg_temp_c": 21.899999999999995, "avg_humidity_pct": 60.208333333333336, "max_wind_speed_kmh": 11.0, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "essen", "date_day": "2026-08-11", "min_temp_c": 15.4, "max_temp_c": 25.9, "avg_temp_c": 20.837500000000002, "avg_humidity_pct": 41.958333333333336, "max_wind_speed_kmh": 15.8, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 0}, {"city_id": "essen", "date_day": "2026-08-12", "min_temp_c": 15.7, "max_temp_c": 31.7, "avg_temp_c": 24.274999999999995, "avg_humidity_pct": 30.375, "max_wind_speed_kmh": 15.1, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 0}, {"city_id": "essen", "date_day": "2026-08-13", "min_temp_c": 20.7, "max_temp_c": 35.7, "avg_temp_c": 28.875, "avg_humidity_pct": 20.583333333333332, "max_wind_speed_kmh": 11.2, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 0}, {"city_id": "essen", "date_day": "2026-08-14", "min_temp_c": 24.0, "max_temp_c": 35.8, "avg_temp_c": 29.812499999999996, "avg_humidity_pct": 24.583333333333332, "max_wind_speed_kmh": 14.9, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 0}, {"city_id": "essen", "date_day": "2026-08-15", "min_temp_c": 22.2, "max_temp_c": 30.4, "avg_temp_c": 25.725000000000005, "avg_humidity_pct": 47.458333333333336, "max_wind_speed_kmh": 13.2, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 0}, {"city_id": "essen", "date_day": "2026-08-16", "min_temp_c": 18.7, "max_temp_c": 26.2, "avg_temp_c": 21.966666666666665, "avg_humidity_pct": 66.625, "max_wind_speed_kmh": 12.6, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 0}, {"city_id": "essen", "date_day": "2026-08-17", "min_temp_c": 16.6, "max_temp_c": 25.7, "avg_temp_c": 21.216666666666672, "avg_humidity_pct": 59.833333333333336, "max_wind_speed_kmh": 12.0, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 0}, {"city_id": "frankfurt", "date_day": "2026-08-11", "min_temp_c": 16.6, "max_temp_c": 28.1, "avg_temp_c": 22.287499999999998, "avg_humidity_pct": 43.5, "max_wind_speed_kmh": 13.2, "min_european_aqi": 18, "max_european_aqi": 34, "avg_european_aqi": 26.0, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "frankfurt", "date_day": "2026-08-12", "min_temp_c": 15.2, "max_temp_c": 31.1, "avg_temp_c": 23.316666666666666, "avg_humidity_pct": 36.875, "max_wind_speed_kmh": 10.2, "min_european_aqi": 17, "max_european_aqi": 43, "avg_european_aqi": 29.541666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "frankfurt", "date_day": "2026-08-13", "min_temp_c": 17.5, "max_temp_c": 33.9, "avg_temp_c": 25.620833333333334, "avg_humidity_pct": 30.375, "max_wind_speed_kmh": 7.6, "min_european_aqi": 20, "max_european_aqi": 57, "avg_european_aqi": 35.375, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "frankfurt", "date_day": "2026-08-14", "min_temp_c": 19.3, "max_temp_c": 36.1, "avg_temp_c": 28.174999999999997, "avg_humidity_pct": 26.25, "max_wind_speed_kmh": 4.7, "min_european_aqi": 17, "max_european_aqi": 62, "avg_european_aqi": 37.25, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "frankfurt", "date_day": "2026-08-15", "min_temp_c": 21.3, "max_temp_c": 36.3, "avg_temp_c": 28.258333333333336, "avg_humidity_pct": 32.625, "max_wind_speed_kmh": 14.2, "min_european_aqi": 23, "max_european_aqi": 71, "avg_european_aqi": 47.208333333333336, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "frankfurt", "date_day": "2026-08-16", "min_temp_c": 20.0, "max_temp_c": 28.5, "avg_temp_c": 24.454166666666662, "avg_humidity_pct": 60.791666666666664, "max_wind_speed_kmh": 5.8, "min_european_aqi": 28, "max_european_aqi": 30, "avg_european_aqi": 29.0, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "frankfurt", "date_day": "2026-08-17", "min_temp_c": 18.7, "max_temp_c": 24.8, "avg_temp_c": 21.395833333333332, "avg_humidity_pct": 68.16666666666667, "max_wind_speed_kmh": 9.2, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "hamburg", "date_day": "2026-08-11", "min_temp_c": 13.4, "max_temp_c": 19.7, "avg_temp_c": 16.379166666666666, "avg_humidity_pct": 62.083333333333336, "max_wind_speed_kmh": 16.1, "min_european_aqi": 14, "max_european_aqi": 31, "avg_european_aqi": 24.041666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "hamburg", "date_day": "2026-08-12", "min_temp_c": 11.7, "max_temp_c": 23.5, "avg_temp_c": 17.529166666666665, "avg_humidity_pct": 62.916666666666664, "max_wind_speed_kmh": 10.7, "min_european_aqi": 14, "max_european_aqi": 34, "avg_european_aqi": 23.5, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "hamburg", "date_day": "2026-08-13", "min_temp_c": 14.2, "max_temp_c": 30.2, "avg_temp_c": 22.170833333333334, "avg_humidity_pct": 52.125, "max_wind_speed_kmh": 11.2, "min_european_aqi": 13, "max_european_aqi": 41, "avg_european_aqi": 27.125, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "hamburg", "date_day": "2026-08-14", "min_temp_c": 16.7, "max_temp_c": 35.0, "avg_temp_c": 26.045833333333334, "avg_humidity_pct": 40.166666666666664, "max_wind_speed_kmh": 9.7, "min_european_aqi": 18, "max_european_aqi": 57, "avg_european_aqi": 33.541666666666664, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "hamburg", "date_day": "2026-08-15", "min_temp_c": 18.2, "max_temp_c": 26.2, "avg_temp_c": 21.229166666666668, "avg_humidity_pct": 75.25, "max_wind_speed_kmh": 9.7, "min_european_aqi": 16, "max_european_aqi": 32, "avg_european_aqi": 23.916666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "hamburg", "date_day": "2026-08-16", "min_temp_c": 16.6, "max_temp_c": 24.8, "avg_temp_c": 20.137500000000003, "avg_humidity_pct": 70.79166666666667, "max_wind_speed_kmh": 11.2, "min_european_aqi": 15, "max_european_aqi": 16, "avg_european_aqi": 15.5, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "hamburg", "date_day": "2026-08-17", "min_temp_c": 16.3, "max_temp_c": 22.9, "avg_temp_c": 18.916666666666668, "avg_humidity_pct": 74.54166666666667, "max_wind_speed_kmh": 10.5, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "leipzig", "date_day": "2026-08-11", "min_temp_c": 14.1, "max_temp_c": 22.8, "avg_temp_c": 18.9625, "avg_humidity_pct": 50.166666666666664, "max_wind_speed_kmh": 12.2, "min_european_aqi": 20, "max_european_aqi": 36, "avg_european_aqi": 26.916666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "leipzig", "date_day": "2026-08-12", "min_temp_c": 14.6, "max_temp_c": 25.9, "avg_temp_c": 20.587500000000002, "avg_humidity_pct": 41.5, "max_wind_speed_kmh": 9.3, "min_european_aqi": 14, "max_european_aqi": 41, "avg_european_aqi": 27.916666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "leipzig", "date_day": "2026-08-13", "min_temp_c": 15.6, "max_temp_c": 29.6, "avg_temp_c": 22.454166666666666, "avg_humidity_pct": 39.833333333333336, "max_wind_speed_kmh": 8.3, "min_european_aqi": 18, "max_european_aqi": 43, "avg_european_aqi": 30.75, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "leipzig", "date_day": "2026-08-14", "min_temp_c": 17.1, "max_temp_c": 33.5, "avg_temp_c": 25.57083333333333, "avg_humidity_pct": 32.666666666666664, "max_wind_speed_kmh": 6.7, "min_european_aqi": 16, "max_european_aqi": 51, "avg_european_aqi": 32.916666666666664, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "leipzig", "date_day": "2026-08-15", "min_temp_c": 20.8, "max_temp_c": 35.5, "avg_temp_c": 28.36666666666667, "avg_humidity_pct": 32.708333333333336, "max_wind_speed_kmh": 7.8, "min_european_aqi": 20, "max_european_aqi": 63, "avg_european_aqi": 40.958333333333336, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "leipzig", "date_day": "2026-08-16", "min_temp_c": 19.9, "max_temp_c": 26.2, "avg_temp_c": 22.41666666666666, "avg_humidity_pct": 70.04166666666667, "max_wind_speed_kmh": 9.9, "min_european_aqi": 12, "max_european_aqi": 26, "avg_european_aqi": 19.0, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "leipzig", "date_day": "2026-08-17", "min_temp_c": 18.8, "max_temp_c": 27.4, "avg_temp_c": 21.837500000000002, "avg_humidity_pct": 79.625, "max_wind_speed_kmh": 8.7, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "munich", "date_day": "2026-08-11", "min_temp_c": 19.7, "max_temp_c": 30.1, "avg_temp_c": 24.8875, "avg_humidity_pct": 46.5, "max_wind_speed_kmh": 11.7, "min_european_aqi": 18, "max_european_aqi": 55, "avg_european_aqi": 34.208333333333336, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "munich", "date_day": "2026-08-12", "min_temp_c": 16.2, "max_temp_c": 29.2, "avg_temp_c": 22.90833333333333, "avg_humidity_pct": 37.5, "max_wind_speed_kmh": 12.4, "min_european_aqi": 17, "max_european_aqi": 46, "avg_european_aqi": 29.75, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "munich", "date_day": "2026-08-13", "min_temp_c": 15.7, "max_temp_c": 29.2, "avg_temp_c": 22.225000000000005, "avg_humidity_pct": 41.25, "max_wind_speed_kmh": 11.5, "min_european_aqi": 17, "max_european_aqi": 48, "avg_european_aqi": 32.0, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "munich", "date_day": "2026-08-14", "min_temp_c": 14.4, "max_temp_c": 31.4, "avg_temp_c": 23.025000000000006, "avg_humidity_pct": 36.625, "max_wind_speed_kmh": 4.9, "min_european_aqi": 20, "max_european_aqi": 51, "avg_european_aqi": 33.333333333333336, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "munich", "date_day": "2026-08-15", "min_temp_c": 16.2, "max_temp_c": 33.6, "avg_temp_c": 25.516666666666676, "avg_humidity_pct": 44.875, "max_wind_speed_kmh": 7.9, "min_european_aqi": 16, "max_european_aqi": 65, "avg_european_aqi": 41.958333333333336, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "munich", "date_day": "2026-08-16", "min_temp_c": 17.4, "max_temp_c": 24.9, "avg_temp_c": 21.70833333333334, "avg_humidity_pct": 71.08333333333333, "max_wind_speed_kmh": 10.2, "min_european_aqi": 16, "max_european_aqi": 21, "avg_european_aqi": 18.5, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "munich", "date_day": "2026-08-17", "min_temp_c": 16.3, "max_temp_c": 27.1, "avg_temp_c": 20.187500000000004, "avg_humidity_pct": 85.875, "max_wind_speed_kmh": 12.0, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "stuttgart", "date_day": "2026-08-11", "min_temp_c": 20.4, "max_temp_c": 30.4, "avg_temp_c": 25.387499999999992, "avg_humidity_pct": 41.166666666666664, "max_wind_speed_kmh": 14.2, "min_european_aqi": 22, "max_european_aqi": 49, "avg_european_aqi": 34.041666666666664, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "stuttgart", "date_day": "2026-08-12", "min_temp_c": 18.0, "max_temp_c": 32.7, "avg_temp_c": 25.21666666666667, "avg_humidity_pct": 29.041666666666668, "max_wind_speed_kmh": 11.8, "min_european_aqi": 15, "max_european_aqi": 49, "avg_european_aqi": 31.416666666666668, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "stuttgart", "date_day": "2026-08-13", "min_temp_c": 18.5, "max_temp_c": 32.4, "avg_temp_c": 25.183333333333337, "avg_humidity_pct": 35.75, "max_wind_speed_kmh": 8.5, "min_european_aqi": 15, "max_european_aqi": 56, "avg_european_aqi": 35.5, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "stuttgart", "date_day": "2026-08-14", "min_temp_c": 17.9, "max_temp_c": 34.8, "avg_temp_c": 26.399999999999995, "avg_humidity_pct": 40.791666666666664, "max_wind_speed_kmh": 4.7, "min_european_aqi": 15, "max_european_aqi": 59, "avg_european_aqi": 36.083333333333336, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "stuttgart", "date_day": "2026-08-15", "min_temp_c": 19.9, "max_temp_c": 36.3, "avg_temp_c": 27.90833333333333, "avg_humidity_pct": 37.958333333333336, "max_wind_speed_kmh": 13.8, "min_european_aqi": 14, "max_european_aqi": 65, "avg_european_aqi": 46.416666666666664, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "stuttgart", "date_day": "2026-08-16", "min_temp_c": 19.9, "max_temp_c": 25.0, "avg_temp_c": 21.945833333333336, "avg_humidity_pct": 82.79166666666667, "max_wind_speed_kmh": 11.3, "min_european_aqi": 18, "max_european_aqi": 43, "avg_european_aqi": 30.5, "hour_count": 24, "aq_hour_count": 24}, {"city_id": "stuttgart", "date_day": "2026-08-17", "min_temp_c": 17.5, "max_temp_c": 23.5, "avg_temp_c": 20.054166666666667, "avg_humidity_pct": 88.25, "max_wind_speed_kmh": 9.2, "min_european_aqi": null, "max_european_aqi": null, "avg_european_aqi": null, "hour_count": 24, "aq_hour_count": 24}];
+const weeklyData = [{"city_id": "duesseldorf", "week_start": "2026-08-11", "weekly_min_temp_c": 16.2, "weekly_max_temp_c": 36.2, "weekly_avg_temp_c": 25.24642857142857, "weekly_max_wind_speed_kmh": 15.5, "weekly_max_european_aqi": 65, "hour_count": 168, "aq_hour_count": 168, "rank_by_avg_temp": 1}, {"city_id": "cologne", "week_start": "2026-08-11", "weekly_min_temp_c": 16.9, "weekly_max_temp_c": 36.0, "weekly_avg_temp_c": 24.965476190476178, "weekly_max_wind_speed_kmh": 13.3, "weekly_max_european_aqi": 67, "hour_count": 168, "aq_hour_count": 168, "rank_by_avg_temp": 2}, {"city_id": "frankfurt", "week_start": "2026-08-11", "weekly_min_temp_c": 15.2, "weekly_max_temp_c": 36.3, "weekly_avg_temp_c": 24.78690476190475, "weekly_max_wind_speed_kmh": 14.2, "weekly_max_european_aqi": 71, "hour_count": 168, "aq_hour_count": 168, "rank_by_avg_temp": 3}, {"city_id": "essen", "week_start": "2026-08-11", "weekly_min_temp_c": 15.4, "weekly_max_temp_c": 35.8, "weekly_avg_temp_c": 24.672619047619055, "weekly_max_wind_speed_kmh": 15.8, "weekly_max_european_aqi": null, "hour_count": 168, "aq_hour_count": 0, "rank_by_avg_temp": 4}, {"city_id": "stuttgart", "week_start": "2026-08-11", "weekly_min_temp_c": 17.5, "weekly_max_temp_c": 36.3, "weekly_avg_temp_c": 24.58511904761906, "weekly_max_wind_speed_kmh": 14.2, "weekly_max_european_aqi": 65, "hour_count": 168, "aq_hour_count": 168, "rank_by_avg_temp": 5}, {"city_id": "dortmund", "week_start": "2026-08-11", "weekly_min_temp_c": 14.7, "weekly_max_temp_c": 35.6, "weekly_avg_temp_c": 24.229761904761904, "weekly_max_wind_speed_kmh": 16.6, "weekly_max_european_aqi": 63, "hour_count": 168, "aq_hour_count": 168, "rank_by_avg_temp": 6}, {"city_id": "munich", "week_start": "2026-08-11", "weekly_min_temp_c": 14.4, "weekly_max_temp_c": 33.6, "weekly_avg_temp_c": 22.922619047619044, "weekly_max_wind_speed_kmh": 12.4, "weekly_max_european_aqi": 65, "hour_count": 168, "aq_hour_count": 168, "rank_by_avg_temp": 7}, {"city_id": "leipzig", "week_start": "2026-08-11", "weekly_min_temp_c": 14.1, "weekly_max_temp_c": 35.5, "weekly_avg_temp_c": 22.885119047619042, "weekly_max_wind_speed_kmh": 12.2, "weekly_max_european_aqi": 63, "hour_count": 168, "aq_hour_count": 168, "rank_by_avg_temp": 8}, {"city_id": "berlin", "week_start": "2026-08-11", "weekly_min_temp_c": 13.8, "weekly_max_temp_c": 34.5, "weekly_avg_temp_c": 22.051785714285717, "weekly_max_wind_speed_kmh": 16.1, "weekly_max_european_aqi": 65, "hour_count": 168, "aq_hour_count": 168, "rank_by_avg_temp": 9}, {"city_id": "hamburg", "week_start": "2026-08-11", "weekly_min_temp_c": 11.7, "weekly_max_temp_c": 35.0, "weekly_avg_temp_c": 20.34404761904761, "weekly_max_wind_speed_kmh": 16.1, "weekly_max_european_aqi": 57, "hour_count": 168, "aq_hour_count": 168, "rank_by_avg_temp": 10}];
+const cities = [{"city_id": "berlin", "city_name": "Berlin", "country": "DE", "latitude": 52.52, "longitude": 13.4}, {"city_id": "hamburg", "city_name": "Hamburg", "country": "DE", "latitude": 53.56, "longitude": 10.0}, {"city_id": "munich", "city_name": "Munich", "country": "DE", "latitude": 48.14, "longitude": 11.58}, {"city_id": "cologne", "city_name": "Cologne", "country": "DE", "latitude": 50.944, "longitude": 6.96}, {"city_id": "frankfurt", "city_name": "Frankfurt", "country": "DE", "latitude": 50.12, "longitude": 8.68}, {"city_id": "stuttgart", "city_name": "Stuttgart", "country": "DE", "latitude": 48.78, "longitude": 9.18}, {"city_id": "duesseldorf", "city_name": "D\u00fcsseldorf", "country": "DE", "latitude": 51.232, "longitude": 6.786}, {"city_id": "leipzig", "city_name": "Leipzig", "country": "DE", "latitude": 51.34, "longitude": 12.379999}, {"city_id": "dortmund", "city_name": "Dortmund", "country": "DE", "latitude": 51.52, "longitude": 7.4529996}, {"city_id": "essen", "city_name": "Essen", "country": "DE", "latitude": 51.447998, "longitude": 7.0179996}];
+
+function titleCase(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function getCityName(id) {
+  const c = cities.find(x => x.city_id === id);
+  return c ? c.city_name : titleCase(id);
+}
+
+function aqiClass(val) {
+  if (val === null || val === undefined) return 'aqi-missing';
+  if (val <= 50) return 'aqi-good';
+  if (val <= 100) return 'aqi-moderate';
+  return 'aqi-bad';
+}
+
+function aqiLabel(val) {
+  if (val === null || val === undefined) return 'N/A';
+  if (val <= 50) return 'Good';
+  if (val <= 100) return 'Moderate';
+  if (val <= 150) return 'Unhealthy (Sensitive)';
+  return 'Unhealthy';
+}
+
+const hottest = weeklyData.reduce((a, b) => a.weekly_avg_temp_c > b.weekly_avg_temp_c ? a : b);
+const windiest = weeklyData.reduce((a, b) => a.weekly_max_wind_speed_kmh > b.weekly_max_wind_speed_kmh ? a : b);
+const worstAqi = weeklyData
+  .filter(d => d.weekly_max_european_aqi !== null && d.weekly_max_european_aqi !== undefined)
+  .reduce((a, b) => a.weekly_max_european_aqi > b.weekly_max_european_aqi ? a : b, weeklyData[0]);
+
+document.getElementById('hottest-city').textContent = getCityName(hottest.city_id);
+document.getElementById('hottest-temp').textContent = hottest.weekly_avg_temp_c.toFixed(1) + ' °C avg';
+document.getElementById('windiest-city').textContent = getCityName(windiest.city_id);
+document.getElementById('windiest-speed').textContent = windiest.weekly_max_wind_speed_kmh.toFixed(1) + ' km/h max';
+if (worstAqi && worstAqi.weekly_max_european_aqi != null) {
+  document.getElementById('worst-aqi-city').textContent = getCityName(worstAqi.city_id);
+  document.getElementById('worst-aqi-val').textContent = worstAqi.weekly_max_european_aqi + ' AQI max (' + aqiLabel(worstAqi.weekly_max_european_aqi) + ')';
+} else {
+  document.getElementById('worst-aqi-city').textContent = 'N/A';
+  document.getElementById('worst-aqi-val').textContent = 'No AQ data';
+}
+
+const dates = [...new Set(dailyData.map(d => d.date_day))].sort();
+if (dates.length > 0) {
+  const fmt = d => new Date(d).toLocaleDateString('en-GB', { year: 'numeric', month: 'short', day: 'numeric' });
+  document.getElementById('date-range').textContent =
+    dates.length === 1 ? fmt(dates[0]) : '${fmt(dates[0])} – ${fmt(dates[dates.length - 1])}';
+}
+
+const cityColors = {
+  'berlin': '#38bdf8', 'hamburg': '#818cf8', 'munich': '#f472b6',
+  'cologne': '#34d399', 'frankfurt': '#fbbf24', 'stuttgart': '#f87171',
+  'duesseldorf': '#a78bfa', 'dortmund': '#2dd4bf', 'essen': '#fb923c', 'leipzig': '#e879f9'
+};
+
+new Chart(document.getElementById('dailyTempChart'), {
+  type: 'line',
+  data: {
+    labels: dates.map(d => new Date(d).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })),
+    datasets: cities.map(city => ({
+      label: city.city_name,
+      data: dates.map(date => {
+        const row = dailyData.find(d => d.city_id === city.city_id && d.date_day === date);
+        return row ? row.avg_temp_c : null;
+      }),
+      borderColor: cityColors[city.city_id] || '#94a3b8',
+      backgroundColor: cityColors[city.city_id] || '#94a3b8',
+      tension: 0.3, pointRadius: 3, borderWidth: 2
+    }))
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'top', labels: { color: '#94a3b8', usePointStyle: true } },
+      tooltip: { backgroundColor: '#1e293b', titleColor: '#e2e8f0', bodyColor: '#e2e8f0', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, title: { display: true, text: '°C', color: '#64748b' } }
+    }
+  }
+});
+
+new Chart(document.getElementById('dailyHumidityChart'), {
+  type: 'line',
+  data: {
+    labels: dates.map(d => new Date(d).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })),
+    datasets: cities.map(city => ({
+      label: city.city_name,
+      data: dates.map(date => {
+        const row = dailyData.find(d => d.city_id === city.city_id && d.date_day === date);
+        return row ? row.avg_humidity_pct : null;
+      }),
+      borderColor: cityColors[city.city_id] || '#94a3b8',
+      backgroundColor: cityColors[city.city_id] || '#94a3b8',
+      tension: 0.3, pointRadius: 3, borderWidth: 2
+    }))
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'top', labels: { color: '#94a3b8', usePointStyle: true } },
+      tooltip: { backgroundColor: '#1e293b', titleColor: '#e2e8f0', bodyColor: '#e2e8f0', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, title: { display: true, text: '%', color: '#64748b' }, min: 0, max: 100 }
+    }
+  }
+});
+
+new Chart(document.getElementById('dailyAqiChart'), {
+  type: 'line',
+  data: {
+    labels: dates.map(d => new Date(d).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })),
+    datasets: cities.map(city => ({
+      label: city.city_name,
+      data: dates.map(date => {
+        const row = dailyData.find(d => d.city_id === city.city_id && d.date_day === date);
+        return row && row.max_european_aqi != null ? row.max_european_aqi : null;
+      }),
+      borderColor: cityColors[city.city_id] || '#94a3b8',
+      backgroundColor: cityColors[city.city_id] || '#94a3b8',
+      tension: 0.3, pointRadius: 3, borderWidth: 2
+    }))
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'top', labels: { color: '#94a3b8', usePointStyle: true } },
+      tooltip: { backgroundColor: '#1e293b', titleColor: '#e2e8f0', bodyColor: '#e2e8f0', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, title: { display: true, text: 'AQI', color: '#64748b' } }
+    }
+  }
+});
+
+weeklyData.sort((a, b) => a.rank_by_avg_temp - b.rank_by_avg_temp);
+new Chart(document.getElementById('rankingChart'), {
+  type: 'bar',
+  data: {
+    labels: weeklyData.map(d => getCityName(d.city_id)),
+    datasets: [{
+      label: 'Avg Temp (°C)',
+      data: weeklyData.map(d => d.weekly_avg_temp_c),
+      backgroundColor: weeklyData.map(d => d.rank_by_avg_temp === 1 ? '#fbbf24' : '#38bdf8'),
+      borderRadius: 6
+    }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+      y: { grid: { display: false }, ticks: { color: '#e2e8f0' } }
+    }
+  }
+});
+
+weeklyData.sort((a, b) => (b.weekly_max_european_aqi || 0) - (a.weekly_max_european_aqi || 0));
+new Chart(document.getElementById('aqiChart'), {
+  type: 'bar',
+  data: {
+    labels: weeklyData.map(d => getCityName(d.city_id)),
+    datasets: [{
+      label: 'Max European AQI',
+      data: weeklyData.map(d => d.weekly_max_european_aqi != null ? d.weekly_max_european_aqi : 0),
+      backgroundColor: weeklyData.map(d => {
+        const v = d.weekly_max_european_aqi;
+        if (v == null) return '#64748b';
+        if (v <= 50) return '#34d399';
+        if (v <= 100) return '#fbbf24';
+        return '#f87171';
+      }),
+      borderRadius: 6
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#e2e8f0' } },
+      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' }, title: { display: true, text: 'AQI', color: '#64748b' } }
+    }
+  }
+});
+
+weeklyData.sort((a, b) => a.rank_by_avg_temp - b.rank_by_avg_temp);
+const tbody = document.getElementById('tableBody');
+weeklyData.forEach(row => {
+  const tr = document.createElement('tr');
+  const rankClass = row.rank_by_avg_temp <= 3 ? 'rank-' + row.rank_by_avg_temp : '';
+  const aqiVal = row.weekly_max_european_aqi;
+  const aqiHtml = aqiVal != null
+    ? '<span class="aqi-badge ' + aqiClass(aqiVal) + '">' + aqiVal + ' — ' + aqiLabel(aqiVal) + '</span>'
+    : '<span class="aqi-badge aqi-missing">N/A</span>';
+  tr.innerHTML = '<td><span class="rank ' + rankClass + '">#' + row.rank_by_avg_temp + '</span></td>' +
+    '<td><strong>' + getCityName(row.city_id) + '</strong></td>' +
+    '<td>' + row.weekly_avg_temp_c.toFixed(1) + ' °C</td>' +
+    '<td>' + row.weekly_min_temp_c.toFixed(1) + ' / ' + row.weekly_max_temp_c.toFixed(1) + '</td>' +
+    '<td>' + row.weekly_max_wind_speed_kmh.toFixed(1) + '</td>' +
+    '<td>' + aqiHtml + '</td>' +
+    '<td>' + (row.hour_count === 168 ? '✅ 168 hrs' : '⚠️ ' + row.hour_count + ' hrs') + '</td>';
+  tbody.appendChild(tr);
+});
+</script>
+</body>
+</html>
