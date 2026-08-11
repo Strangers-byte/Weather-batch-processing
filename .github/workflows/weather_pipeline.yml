@@ -1,0 +1,46 @@
+name: Weather Pipeline
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # Daily 06:00 UTC
+  workflow_dispatch:      
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install dbt-duckdb
+
+      - name: Run ingestion
+        run: python ingestion/main.py
+
+      - name: Run dbt
+        run: dbt build
+
+      - name: Generate dashboard
+        run: python generate_dashboard.py
+
+      - name: Commit and push updated dashboard
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add weather_dashboard.html
+          git diff --staged --quiet || git commit -m "Update dashboard $(date +%Y-%m-%d)"
+          git push
