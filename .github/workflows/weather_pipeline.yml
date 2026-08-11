@@ -32,7 +32,8 @@ jobs:
         run: python ingestion/main.py
 
       - name: Run dbt
-        run: dbt build
+        working-directory: weather_dbt
+        run: dbt build --profiles-dir .
 
       - name: Generate dashboard
         run: python generate_dashboard.py

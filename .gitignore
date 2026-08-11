@@ -1,7 +1,6 @@
 # Environment & secrets
 .env
 airflow/.env
-weather_dbt/profiles.yml
 weather_dbt/.user.yml
 logs/
 
