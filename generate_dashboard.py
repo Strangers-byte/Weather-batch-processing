@@ -10,6 +10,8 @@ from datetime import datetime, date
 from string import Template
 
 DB_PATH = "weather_dbt/dev.duckdb"
+if not Path(DB_PATH).exists():
+    DB_PATH = "dev.duckdb"  # CI fallback
 OUTPUT_PATH = "weather_dashboard.html"
 
 
