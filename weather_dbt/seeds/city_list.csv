@@ -1,0 +1,11 @@
+city_id,city_name,country,latitude,longitude
+berlin,Berlin,DE,52.52,13.4
+hamburg,Hamburg,DE,53.56,10
+munich,Munich,DE,48.14,11.58
+cologne,Cologne,DE,50.944,6.96
+frankfurt,Frankfurt,DE,50.12,8.68
+stuttgart,Stuttgart,DE,48.78,9.18
+duesseldorf,Düsseldorf,DE,51.232,6.786
+leipzig,Leipzig,DE,51.34,12.379999
+dortmund,Dortmund,DE,51.52,7.4529996
+essen,Essen,DE,51.447998,7.0179996

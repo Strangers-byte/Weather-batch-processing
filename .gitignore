@@ -1,37 +1,28 @@
 # Environment & secrets
 .env
-airflow/.env
 weather_dbt/.user.yml
-logs/
 
 # Virtual environment
 weather_env/
 
-# Airflow runtime
-airflow/
-airflow/logs/
-airflow/config/
-airflow/plugins/
-
-# Database files
+# Database files (generated)
+*.duckdb
 data/
 db/
 duckdb_data/
-*.duckdb
 
-# dbt
+# dbt generated artifacts
 weather_dbt/target/
 weather_dbt/dbt_packages/
 weather_dbt/logs/
 
-# Python
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
-__init__.py
+
 # OS
 .DS_Store
-testDB.py
 
-# CSV Files
-*.csv
+# Test files
+testDB.py
