@@ -2,4 +2,4 @@ models:
     - name: weather_7_days_hourly
       description: Current weather with city name
     - name: air_quality_7_days_hourly
-      description: Current weather with city name
+      description: Current air quality with city name

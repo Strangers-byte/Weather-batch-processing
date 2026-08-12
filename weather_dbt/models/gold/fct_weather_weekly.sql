@@ -45,8 +45,7 @@ SELECT
     hour_count,
     aq_hour_count,
 
-    {# RANK() OVER (PARTITION BY week_start ORDER BY weekly_avg_temp_c DESC) AS rank_by_avg_temp, #}
-    RANK() OVER (ORDER BY weekly_avg_temp_c DESC) AS rank_by_avg_temp,
+    RANK() OVER (PARTITION BY week_start ORDER BY weekly_avg_temp_c DESC) AS rank_by_avg_temp,
 
     CURRENT_TIMESTAMP AS computed_at
 
