@@ -105,3 +105,6 @@ weather_pipeline/
 ├── weather_dashboard.html
 └── README.md
 ```
+
+![Dashboard Screenshot](images/image.png)
+![Dashboard Screenshot](images/image2.png)
